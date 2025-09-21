@@ -211,8 +211,8 @@ const createShow = asyncHandler(async (req, res) => {
     const daysDiff = Math.ceil((showEndDate - showDate) / (1000 * 60 * 60 * 24));
     if (daysDiff > 30) {
       return res.status(400).json({
-      success: false,
-      message: 'Maximum 30 days allowed for recurring shows'
+        success: false,
+        message: 'Maximum 30 days allowed for recurring shows'
       });
     }
     if (showEndDate <= showDate) {
@@ -272,32 +272,32 @@ const createShow = asyncHandler(async (req, res) => {
         showDate: {
           $gte: startOfDay,
           $lt: endOfDay
-    },
-    showTime: showTime,
-    isActive: true
-  });
+        },
+        showTime: showTime,
+        isActive: true
+      });
 
-  if (!conflictingShow) {
-    const childShowData = {
-      movie,
-      cinema: cinemaId,
-      screen,
-      showDate: new Date(currentDate),
-      showTime,
-      showEndDate,
-      isRecurring: false, // Child shows are not recurring themselves
-      parentShowId: parentShow._id,
-      pricing: showPricing,
-      bookedSeats: [],
-      availableSeats: screenExists.seatLayout?.totalSeats || 100,
-      endTime: showTime
-    };
+      if (!conflictingShow) {
+        const childShowData = {
+          movie,
+          cinema: cinemaId,
+          screen,
+          showDate: new Date(currentDate),
+          showTime,
+          showEndDate,
+          isRecurring: false, // Child shows are not recurring themselves
+          parentShowId: parentShow._id,
+          pricing: showPricing,
+          bookedSeats: [],
+          availableSeats: screenExists.seatLayout?.totalSeats || 100,
+          endTime: showTime
+        };
 
-    const childShow = await Show.create(childShowData);
-    createdShows.push(childShow);
-  }
+        const childShow = await Show.create(childShowData);
+        createdShows.push(childShow);
+      }
 
-  currentDate.setDate(currentDate.getDate() + 1);
+      currentDate.setDate(currentDate.getDate() + 1);
     }
   } else {
     // Check for conflicting shows for single show
@@ -410,4 +410,160 @@ const deleteShow = asyncHandler(async (req, res) => {
       deletedCount += childCount;
     } else if (show.parentShowId) {
       // This is a child show, delete parent and all siblings
-The response is too long; only the first 200000 characters are shown. I'll continue in the next tool call.
+      await Show.deleteMany({ 
+        $or: [
+          { _id: show.parentShowId },
+          { parentShowId: show.parentShowId }
+        ]
+      });
+      const totalCount = await Show.countDocuments({ 
+        $or: [
+          { _id: show.parentShowId },
+          { parentShowId: show.parentShowId }
+        ]
+      });
+      deletedCount = totalCount + 1; // +1 for the current show
+    }
+  }
+
+  // Delete the specified show
+  await Show.findByIdAndDelete(req.params.id);
+
+  res.json({
+    success: true,
+    count: deletedCount,
+    message: deletedCount > 1 
+      ? `${deletedCount} shows deleted successfully from the recurring series`
+      : 'Show deleted successfully'
+  });
+});
+
+// @desc    Lock seats temporarily
+// @route   POST /api/shows/:id/lock-seats
+// @access  Private
+const lockSeats = asyncHandler(async (req, res) => {
+  const { seats } = req.body;
+  const showId = req.params.id;
+  const userId = req.user.id;
+
+  const show = await Show.findById(showId);
+  if (!show) {
+    return res.status(404).json({
+      success: false,
+      message: 'Show not found'
+    });
+  }
+
+  // Clean up expired locks first
+  show.bookedSeats = show.bookedSeats.filter(seat => {
+    if (seat.isTemporarilyBlocked && new Date() > seat.blockExpiry) {
+      return false; // Remove expired locks
+    }
+    return true;
+  });
+
+  // Check if seats are available
+  for (const seatPos of seats) {
+    const existingSeat = show.bookedSeats.find(seat => 
+      seat.row === seatPos.row && seat.column === seatPos.column
+    );
+    
+    if (existingSeat) {
+      // If seat is permanently booked (has bookingId), it's not available
+      if (existingSeat.bookingId) {
+        return res.status(400).json({
+          success: false,
+          message: `Seat ${show.generateSeatNumber(seatPos.row, seatPos.column)} is not available`
+        });
+      }
+      
+      // If seat is temporarily blocked by another user, it's not available
+      if (existingSeat.isTemporarilyBlocked && 
+          existingSeat.blockedBy && 
+          existingSeat.blockedBy.toString() !== userId.toString()) {
+        return res.status(400).json({
+          success: false,
+          message: `Seat ${show.generateSeatNumber(seatPos.row, seatPos.column)} is not available`
+        });
+      }
+      
+      // If seat is blocked by same user or block has expired, it can be re-locked
+    }
+  }
+
+  // Remove existing locks by this user for these seats and add new locks
+  for (const seatPos of seats) {
+    // Remove any existing lock for this seat by this user
+    show.bookedSeats = show.bookedSeats.filter(seat => 
+      !(seat.row === seatPos.row && 
+        seat.column === seatPos.column && 
+        seat.blockedBy && 
+        seat.blockedBy.toString() === userId.toString())
+    );
+    
+    // Add new lock
+    show.bookedSeats.push({
+      row: seatPos.row,
+      column: seatPos.column,
+      seatNumber: show.generateSeatNumber(seatPos.row, seatPos.column),
+      seatType: seatPos.row <= 3 ? 'premium' : 'regular',
+      isTemporarilyBlocked: true,
+      blockedAt: new Date(),
+      blockedBy: userId,
+      blockExpiry: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
+    });
+  }
+
+  await show.save();
+
+  res.json({
+    success: true,
+    message: 'Seats locked successfully',
+    lockedUntil: new Date(Date.now() + 10 * 60 * 1000)
+  });
+});
+
+// @desc    Release locked seats
+// @route   POST /api/shows/:id/release-seats
+// @access  Private
+const releaseSeats = asyncHandler(async (req, res) => {
+  const { seats } = req.body;
+  const showId = req.params.id;
+  const userId = req.user.id;
+
+  const show = await Show.findById(showId);
+  if (!show) {
+    return res.status(404).json({
+      success: false,
+      message: 'Show not found'
+    });
+  }
+
+  // Remove locks for this user on specified seats
+  show.bookedSeats = show.bookedSeats.filter(seat => {
+    if (seat.isTemporarilyBlocked && 
+        seat.blockedBy?.toString() === userId &&
+        seats.some(s => s.row === seat.row && s.column === seat.column)) {
+      return false; // Remove the lock
+    }
+    return true;
+  });
+
+  await show.save();
+
+  res.json({
+    success: true,
+    message: 'Seats released successfully'
+  });
+});
+
+module.exports = {
+  getShows,
+  getShow,
+  getShowSeats,
+  createShow,
+  updateShow,
+  deleteShow,
+  lockSeats,
+  releaseSeats
+};
