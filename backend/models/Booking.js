@@ -148,4 +148,3 @@ bookingSchema.methods.isExpired = function() {
 };
 
 module.exports = mongoose.model('Booking', bookingSchema);
-

@@ -52,11 +52,11 @@ const showSchema = new mongoose.Schema({
     regular: {
       type: Number,
       required: true,
-      min: [50, 'Minimum price should be \u20b950']
+      min: [50, 'Minimum price should be ₹50']
     },
     premium: {
       type: Number,
-      min: [50, 'Minimum price should be \u20b950']
+      min: [50, 'Minimum price should be ₹50']
     }
   },
   availableSeats: {

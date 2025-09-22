@@ -6,7 +6,10 @@ function Header({ user, logout }) {
     <header className="header">
       <div className="container">
         <div className="header-content">
-          <Link to="/" className="logo">MovieBooking</Link>
+          <Link to="/" className="logo">
+            MovieBooking
+          </Link>
+          
           <nav>
             <ul className="nav-links">
               <li><Link to="/">Home</Link></li>
@@ -14,11 +17,14 @@ function Header({ user, logout }) {
               {user?.role === 'admin' && <li><Link to="/admin">Admin</Link></li>}
             </ul>
           </nav>
+          
           <div className="auth-buttons">
             {user ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <span>Welcome, {user.name}</span>
-                <button onClick={logout} className="btn btn-secondary">Logout</button>
+                <button onClick={logout} className="btn btn-secondary">
+                  Logout
+                </button>
               </div>
             ) : (
               <>

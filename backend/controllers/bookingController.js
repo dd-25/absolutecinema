@@ -603,4 +603,3 @@ module.exports = {
   cancelBooking,
   getAllBookings
 };
-

@@ -1,5 +1,6 @@
 import React from 'react';
 
+// Utility function to create fallback image elements
 export const createFallbackImage = (width = 300, height = 400, text = 'Movie Poster') => {
   const svgContent = `
     <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
@@ -19,7 +20,24 @@ export const createFallbackImage = (width = 300, height = 400, text = 'Movie Pos
   return `data:image/svg+xml;base64,${btoa(svgContent)}`;
 };
 
-export const MoviePosterImage = ({ src, alt = 'Movie Poster', width = 300, height = 400, className = '', style = {} }) => {
-  const handleError = (e) => { e.target.src = createFallbackImage(width, height, alt); };
-  return React.createElement('img', { src: src || createFallbackImage(width, height, alt), alt, className, style: { backgroundColor: '#f0f0f0', ...style }, onError: handleError });
+// React component for reliable image with fallback
+export const MoviePosterImage = ({ 
+  src, 
+  alt = "Movie Poster", 
+  width = 300, 
+  height = 400, 
+  className = "", 
+  style = {} 
+}) => {
+  const handleError = (e) => {
+    e.target.src = createFallbackImage(width, height, alt);
+  };
+
+  return React.createElement('img', {
+    src: src || createFallbackImage(width, height, alt),
+    alt: alt,
+    className: className,
+    style: { backgroundColor: '#f0f0f0', ...style },
+    onError: handleError
+  });
 };

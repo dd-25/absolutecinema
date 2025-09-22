@@ -25,4 +25,3 @@ router.put('/:id/confirm', protect, confirmBooking);
 router.put('/:id/cancel', protect, cancelBooking);
 
 module.exports = router;
-
