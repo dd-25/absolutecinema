@@ -1,7 +1,8 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import Header from './components/Header';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import MainLayout from './components/MainLayout';
+import { RequireAuth, RequireAdmin, PublicOnly } from './components/RouteGuards';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -12,116 +13,32 @@ import BookingHistory from './pages/BookingHistory';
 import AdminPanel from './pages/AdminPanel';
 import './index.css';
 
-// Protected Route Component
-function ProtectedRoute({ children, requireAdmin = false }) {
-  const { isAuthenticated, user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="loading">
-        <div className="spinner"></div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (requireAdmin && user?.role !== 'admin') {
-    return <Navigate to="/" replace />;
-  }
-
-  return children;
-}
-
-// Public Route Component (redirect if already authenticated)
-function PublicRoute({ children }) {
-  const { isAuthenticated, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="loading">
-        <div className="spinner"></div>
-      </div>
-    );
-  }
-
-  if (isAuthenticated) {
-    return <Navigate to="/" replace />;
-  }
-
-  return children;
-}
-
-// Main App Routes Component
 function AppRoutes() {
-  const { user, logout } = useAuth();
-
   return (
     <Router>
-      <div>
-        <Header user={user} logout={logout} />
-        <main>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route 
-              path="/login" 
-              element={
-                <PublicRoute>
-                  <Login />
-                </PublicRoute>
-              } 
-            />
-            <Route 
-              path="/register" 
-              element={
-                <PublicRoute>
-                  <Register />
-                </PublicRoute>
-              } 
-            />
-            <Route path="/cinema/:cinemaId" element={<CinemaDetails />} />
-            <Route 
-              path="/show/:showId/seats" 
-              element={
-                <ProtectedRoute>
-                  <SeatSelection />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/booking/:bookingId/confirmation" 
-              element={
-                <ProtectedRoute>
-                  <BookingConfirmation />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/bookings" 
-              element={
-                <ProtectedRoute>
-                  <BookingHistory />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/admin" 
-              element={
-                <ProtectedRoute requireAdmin={true}>
-                  <AdminPanel />
-                </ProtectedRoute>
-              } 
-            />
-          </Routes>
-        </main>
-      </div>
+      <Routes>
+        <Route path="/" element={<MainLayout />}>
+          {/* Public routes */}
+          <Route index element={<Home />} />
+          <Route path="cinema/:cinemaId" element={<CinemaDetails />} />
+
+          {/* Auth-related pages (public only) */}
+          <Route path="login" element={<PublicOnly><Login /></PublicOnly>} />
+          <Route path="register" element={<PublicOnly><Register /></PublicOnly>} />
+
+          {/* Protected routes */}
+          <Route path="show/:showId/seats" element={<RequireAuth><SeatSelection /></RequireAuth>} />
+          <Route path="booking/:bookingId/confirmation" element={<RequireAuth><BookingConfirmation /></RequireAuth>} />
+          <Route path="bookings" element={<RequireAuth><BookingHistory /></RequireAuth>} />
+
+          {/* Admin */}
+          <Route path="admin" element={<RequireAdmin><AdminPanel /></RequireAdmin>} />
+        </Route>
+      </Routes>
     </Router>
   );
 }
 
-// Main App Component with AuthProvider
 function App() {
   return (
     <AuthProvider>

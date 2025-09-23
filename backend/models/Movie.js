@@ -102,8 +102,6 @@ movieSchema.virtual('shows', {
 
 // Create indexes
 movieSchema.index({ title: 1 });
-movieSchema.index({ genre: 1 });
-movieSchema.index({ language: 1 });
 movieSchema.index({ releaseDate: -1 });
 movieSchema.index({ isNowShowing: 1, isActive: 1 });
 

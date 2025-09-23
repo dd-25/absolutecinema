@@ -23,7 +23,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      window.location.href = '/login';
+      // Let the app detect cleared storage and handle redirect/UI updates
     }
     return Promise.reject(error);
   }

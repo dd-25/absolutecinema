@@ -31,7 +31,14 @@ function Login() {
     
     if (result.success) {
       // Redirect to the intended page or home
-      const from = location.state?.from || '/';
+      let from = '/';
+      try {
+        const candidate = location.state?.from;
+        if (typeof candidate === 'string') from = candidate;
+        else if (candidate && typeof candidate === 'object' && candidate.pathname) from = candidate.pathname + (candidate.search || '');
+      } catch (ex) {
+        // fallback to '/'
+      }
       navigate(from, { replace: true });
     } else {
       console.error('Login: Failed with error:', result.error);

@@ -197,4 +197,26 @@ showSchema.index({ showStatus: 1, showDate: 1 });
 showSchema.index({ parentShowId: 1 }); // For recurring shows
 showSchema.index({ isRecurring: 1, showDate: 1 }); // For series management
 
+// When a show is marked completed, mark related pending bookings as expired.
+showSchema.post('findOneAndUpdate', async function(doc) {
+  try {
+    if (!doc) return;
+    // If showStatus was updated to 'completed', expire pending bookings.
+    // Note: this hook runs after findOneAndUpdate; apps that change showStatus
+    // using save() won't trigger this — consider centralizing showStatus updates.
+    if (doc.showStatus === 'completed') {
+      const Booking = mongoose.model('Booking');
+      const now = new Date();
+      const res = await Booking.updateMany(
+        { show: doc._id, bookingStatus: 'pending' },
+        { $set: { bookingStatus: 'expired', cancelledAt: now, cancellationReason: 'show_completed' } }
+      );
+      // log basic info for operators
+      console.log(`Expired ${res.modifiedCount || res.nModified || 0} bookings for show ${doc._id}`);
+    }
+  } catch (err) {
+    console.error('Error expiring bookings on show completion', err);
+  }
+});
+
 module.exports = mongoose.model('Show', showSchema);

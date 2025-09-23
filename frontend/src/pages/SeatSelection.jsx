@@ -261,31 +261,55 @@ function SeatSelection() {
 
       const response = await api.post('/bookings', bookingData);
       
-      // Check if the API call was successful
-      if (!response.data || !response.data.success) {
-        throw new Error('Booking API returned unsuccessful response');
+      // Check if the API call was successful (defensive)
+      if (!response || !response.data) {
+        console.error('Empty response from booking API', response);
+        throw new Error('Empty response from booking API');
       }
-      
-      // Extract booking data
-      const booking = response.data.data;
-      
+
+      // Defensive extraction: backend may return booking under different keys
+      let booking = null;
+      try {
+        // Prefer response.data.data (standard), but fall back to other possibilities
+        booking = response.data.data || response.data.booking || response.data || null;
+      } catch (ex) {
+        console.error('Error extracting booking from response', ex, response);
+        booking = null;
+      }
+
+      // Log full response for debugging when booking is unexpectedly missing
       if (!booking) {
-        console.error('Full response:', response);
+        console.error('No booking object found in response. Full response:', response);
         throw new Error('No booking data received from server');
       }
-      
-      // Get booking ID with better error handling
-      const bookingId = booking._id || booking.id;
-      
-      if (!bookingId) {
+
+  // Get booking ID with better error handling. Prefer top-level bookingId
+  // returned by the API, then fall back to the booking object.
+      // Prefer top-level bookingId, then booking object id fields. Normalize to a plain string.
+      let bookingIdRaw = response.data?.bookingId || booking._id || booking.id || booking.bookingId || (booking && booking._doc && booking._doc._id);
+
+      // Normalize bookingIdRaw into a safe string for URL
+      let bookingIdStr = '';
+      if (bookingIdRaw === undefined || bookingIdRaw === null) {
         console.error('Booking object without ID:', booking);
-        console.error('Booking object type:', typeof booking);
-        console.error('Booking object keys:', Object.keys(booking || {}));
         throw new Error('Booking was created but no ID was returned');
       }
-      
-      // Success! Navigate to confirmation
-      navigate(`/booking/${bookingId}/confirmation`);
+
+      if (typeof bookingIdRaw === 'object') {
+        // Try common fields
+        bookingIdStr = String(bookingIdRaw._id || bookingIdRaw.id || bookingIdRaw.bookingId || bookingIdRaw.toString());
+        console.warn('Normalized bookingId object to string for navigation:', bookingIdStr);
+      } else {
+        bookingIdStr = String(bookingIdRaw);
+      }
+
+      if (!bookingIdStr || bookingIdStr === 'undefined' || bookingIdStr === 'null') {
+        console.error('Invalid booking id after normalization:', bookingIdRaw);
+        throw new Error('Booking was created but id is invalid');
+      }
+
+      // Success! Navigate to confirmation (encode to be safe)
+      navigate(`/booking/${encodeURIComponent(bookingIdStr)}/confirmation`);
     } catch (error) {
       console.error('Booking error:', error); // Debug log
       console.error('Error response:', error.response); // More detailed error info

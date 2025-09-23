@@ -69,8 +69,6 @@ cinemaSchema.virtual('screens', {
 });
 
 // Create indexes
-cinemaSchema.index({ 'location.city': 1 });
-cinemaSchema.index({ 'location.pincode': 1 });
 cinemaSchema.index({ name: 1 });
 
 module.exports = mongoose.model('Cinema', cinemaSchema);

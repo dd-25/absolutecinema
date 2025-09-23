@@ -15,6 +15,7 @@ const AUTH_ACTIONS = {
   LOGOUT: 'LOGOUT',
   CLEAR_ERROR: 'CLEAR_ERROR',
   SET_USER: 'SET_USER'
+  ,INITIALIZE: 'INITIALIZE'
 };
 
 // Initial State
@@ -23,7 +24,8 @@ const initialState = {
   token: null,
   loading: false,
   error: null,
-  isAuthenticated: false
+  isAuthenticated: false,
+  initialized: false // indicates we've loaded auth from storage
 };
 
 // Auth Reducer
@@ -45,6 +47,7 @@ const authReducer = (state, action) => {
         user: action.payload.user,
         token: action.payload.token,
         isAuthenticated: true,
+        initialized: true,
         error: null
       };
 
@@ -61,7 +64,9 @@ const authReducer = (state, action) => {
 
     case AUTH_ACTIONS.LOGOUT:
       return {
-        ...initialState
+        ...initialState,
+        // keep initialized true so route guards don't hang after logout
+        initialized: true
       };
 
     case AUTH_ACTIONS.CLEAR_ERROR:
@@ -78,6 +83,12 @@ const authReducer = (state, action) => {
         isAuthenticated: true
       };
 
+    case AUTH_ACTIONS.INITIALIZE:
+      return {
+        ...state,
+        initialized: true
+      };
+
     default:
       return state;
   }
@@ -89,32 +100,28 @@ export const AuthProvider = ({ children }) => {
 
   // Check for existing token on app load
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const user = localStorage.getItem('user');
+    const loadAuth = () => {
+      const token = localStorage.getItem('token');
+      const user = localStorage.getItem('user');
 
-
-    if (token && user) {
-      try {
-        const parsedUser = JSON.parse(user);
-        
-        // Set token in API headers
-        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        
-        dispatch({
-          type: AUTH_ACTIONS.SET_USER,
-          payload: {
-            user: parsedUser,
-            token: token
-          }
-        });
-      } catch (error) {
-        console.error('AuthProvider: Error parsing stored user data:', error);
-        // Invalid stored data, clear it
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+      if (token && user) {
+        try {
+          const parsedUser = JSON.parse(user);
+          dispatch({ type: AUTH_ACTIONS.SET_USER, payload: { user: parsedUser, token } });
+          // Set token header after dispatch
+          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        } catch (err) {
+          console.error('AuthProvider: Error parsing stored user data:', err);
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+        }
       }
-    } else {
-    }
+
+      // Mark initialization complete so route guards don't redirect prematurely
+      dispatch({ type: AUTH_ACTIONS.INITIALIZE });
+    };
+
+    loadAuth();
   }, []);
 
   // Login Function
@@ -270,6 +277,7 @@ export const AuthProvider = ({ children }) => {
     loading: state.loading,
     error: state.error,
     isAuthenticated: state.isAuthenticated,
+    initialized: state.initialized,
     
     // Functions
     login,

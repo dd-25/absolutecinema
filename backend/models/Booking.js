@@ -96,12 +96,11 @@ const bookingSchema = new mongoose.Schema({
     unique: true,
     required: true
   },
-  expiresAt: {
-    type: Date,
-    default: function() {
-      return new Date(Date.now() + 15 * 60 * 1000); // 15 minutes from now
-    }
-  },
+  // `expiresAt` can optionally record a planned expiry time, but we no
+  // longer rely on DB TTL to delete bookings. Bookings are retained and
+  // their `bookingStatus` is set to 'expired' when appropriate (for
+  // example when the related show completes).
+  expiresAt: Date,
   cancelledAt: Date,
   cancellationReason: String
 }, {
@@ -119,9 +118,6 @@ bookingSchema.pre('save', function(next) {
   }
   next();
 });
-
-// Auto-expire bookings
-bookingSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 // Virtual for show details
 bookingSchema.virtual('showDetails', {
